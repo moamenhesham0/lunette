@@ -1,0 +1,95 @@
+package middleware
+
+import (
+	"crypto/hmac"
+	"crypto/sha256"
+	"encoding/base64"
+	"encoding/json"
+	"errors"
+	"lunette-gateway/api"
+	"net/http"
+	"os"
+	"strings"
+	"uuid"
+
+	"github.com/gin-gonic/gin"
+)
+
+func extractUserID(payload string) (uuid.UUID, error) {
+	payloadBytes := []byte(payload)
+
+	var target struct {
+		UserID uuid.UUID `json:"user_id"`
+	}
+
+	err := json.Unmarshal(payloadBytes, &target)
+	if err != nil {
+		return uuid.Nil(), err
+	}
+
+	return target.UserID, nil
+}
+
+func parseJWT(token string, secret string) ([]string, error) {
+	parsedToken := strings.Split(token, ".")
+	if len(parsedToken) != 3 {
+		return nil, errors.New("invalid token")
+	}
+	return parsedToken, nil
+}
+
+func verifyJWTSignature(header, payload, signature, secret string) error {
+	mac := hmac.New(sha256.New, []byte(secret))
+	mac.Write([]byte(header + "." + payload))
+
+	resultSignature := mac.Sum(nil)
+	providedSignature, err := base64.RawURLEncoding.DecodeString(signature)
+
+	// Verify the signature
+	if err != nil {
+		return errors.New("invalid base64 signature")
+	}
+
+	// Verify hashed signature matching the provided one
+	if !hmac.Equal(resultSignature, providedSignature) {
+		return errors.New("signature verification failed")
+	}
+
+	return nil
+}
+
+// returns a JWT middleware that validates the token
+func Auth() gin.HandlerFunc {
+	JWTSecretKey := os.Getenv("AUTH_JWT_SECRET_KEY")
+
+	return func(c *gin.Context) {
+		token := strings.TrimPrefix(c.GetHeader("Authorization"), "Bearer ")
+
+		// Parsed Token should have [header, payload, signature] parts
+		parsedToken, err := parseJWT(token, JWTSecretKey)
+		if err != nil {
+			api.HandleError(c, http.StatusUnauthorized, err, "Unauthorized")
+			c.Abort()
+			return
+		}
+
+		// Signature must be valid base64 and match the expected signature
+		err = verifyJWTSignature(parsedToken[0], parsedToken[1], parsedToken[2], JWTSecretKey)
+		if err != nil {
+			api.HandleError(c, http.StatusUnauthorized, err, "Unauthorized")
+			c.Abort()
+			return
+		}
+
+		// User ID should be attached in the token
+		userID, err := extractUserID(parsedToken[1])
+		if err != nil {
+			api.HandleError(c, http.StatusUnauthorized, err, "Unauthorized")
+			c.Abort()
+			return
+		}
+
+		c.Set("user_id", userID)
+		c.Next()
+	}
+}
