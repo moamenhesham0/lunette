@@ -4,6 +4,7 @@ import (
 	"lunette-gateway/util"
 	"net/http"
 	"testing"
+	"uuid"
 
 	"github.com/alicebob/miniredis/v2"
 	"github.com/gin-gonic/gin"
@@ -47,7 +48,7 @@ func TestRateLimit_UserIDProvided(t *testing.T) {
 	// Given
 	gateway := rateLimitSetup(gin.HandlersChain{
 		func(c *gin.Context) {
-			c.Set("user_id", "123e4567-e89b-12d3-a456-426614174000")
+			c.Set("user_id", uuid.New())
 		},
 		RateLimit(mockRedisSetup(), testRateLimitRequestLimit),
 	})

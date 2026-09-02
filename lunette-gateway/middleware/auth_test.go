@@ -15,6 +15,7 @@ import (
 var testAuthSecret = "SECRET-KEY0-XYZ"
 
 func authSetup() *gin.Engine {
+	gin.SetMode(gin.TestMode)
 	gateway := gin.New()
 	gateway.Use(Auth(testAuthSecret))
 	gateway.GET("/test", func(c *gin.Context) {

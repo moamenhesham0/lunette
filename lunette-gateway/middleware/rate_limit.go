@@ -4,6 +4,7 @@ import (
 	"lunette-gateway/api"
 	"lunette-gateway/db"
 	"net/http"
+	"uuid"
 
 	"github.com/gin-gonic/gin"
 	"github.com/redis/go-redis/v9"
@@ -25,7 +26,7 @@ func extractUserId(c *gin.Context) string {
 	if !exists {
 		return c.ClientIP()
 	}
-	return id.(string)
+	return id.(uuid.UUID).String()
 }
 
 func RateLimit(redisClient *redis.Client, requestLimit int) gin.HandlerFunc {
