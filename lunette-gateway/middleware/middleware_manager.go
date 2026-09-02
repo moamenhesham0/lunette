@@ -7,9 +7,9 @@ import (
 // InitMiddleWares initializes the middleware for the gateway
 func InitMiddleWares(engine *gin.Engine) {
 	engine.Use(
-		// MiddleWare Layers
-		RateLimit(),
-		Auth(),
-		Route(),
+	// MiddleWare Layers
+	//RateLimit(),
+	//Auth(),
+	//Route(),
 	)
 }

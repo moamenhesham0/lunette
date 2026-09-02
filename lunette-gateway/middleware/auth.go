@@ -8,7 +8,6 @@ import (
 	"errors"
 	"lunette-gateway/api"
 	"net/http"
-	"os"
 	"strings"
 	"uuid"
 
@@ -61,8 +60,7 @@ func verifyJWTSignature(header, payload, signature, secret string) (string, erro
 }
 
 // Auth returns a JWT middleware that validates the token
-func Auth() gin.HandlerFunc {
-	JWTSecretKey := os.Getenv("AUTH_JWT_SECRET_KEY")
+func Auth(JWTsecret string) gin.HandlerFunc {
 
 	return func(c *gin.Context) {
 		token := strings.TrimPrefix(c.GetHeader("Authorization"), "Bearer ")
@@ -76,7 +74,7 @@ func Auth() gin.HandlerFunc {
 		}
 
 		// Signature must be valid base64 and match the expected signature
-		msg, err := verifyJWTSignature(parsedToken[0], parsedToken[1], parsedToken[2], JWTSecretKey)
+		msg, err := verifyJWTSignature(parsedToken[0], parsedToken[1], parsedToken[2], JWTsecret)
 		if err != nil {
 			api.HandleError(c, http.StatusUnauthorized, err, msg)
 			c.Abort()

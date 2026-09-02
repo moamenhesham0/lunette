@@ -1,12 +1,9 @@
 package middleware
 
 import (
-	"log"
 	"lunette-gateway/api"
 	"lunette-gateway/db"
 	"net/http"
-	"os"
-	"uuid"
 
 	"github.com/gin-gonic/gin"
 	"github.com/redis/go-redis/v9"
@@ -18,8 +15,8 @@ var rateLimitScript = redis.NewScript(`
 		return 1
 	end
 
-	redis.call("INCR", key)
-	redis.call("EXPIRE", key, 60)
+	redis.call("INCR", KEYS[1])
+	redis.call("EXPIRE", KEYS[1], 60)
 	return 0
 `)
 
@@ -28,18 +25,10 @@ func extractUserId(c *gin.Context) string {
 	if !exists {
 		return c.ClientIP()
 	}
-	return id.(uuid.UUID).String()
+	return id.(string)
 }
 
-func RateLimit() gin.HandlerFunc {
-	redisURL := os.Getenv("GATEWAY_RATELIMIT_REDIS_URL")
-	redisClient, err := db.NewRedisClient(redisURL)
-
-	if err != nil {
-		log.Fatalf("Rate limit Redis client failed to start: %v", err)
-	}
-
-	rateLimitRequestTokensPerMinute := 60
+func RateLimit(redisClient *redis.Client, requestLimit int) gin.HandlerFunc {
 
 	return func(c *gin.Context) {
 
@@ -54,8 +43,8 @@ func RateLimit() gin.HandlerFunc {
 		userId := extractUserId(c)
 
 		// User should be within request limits
-		err = rateLimitScript.Run(c, redisClient, []string{userId}, rateLimitRequestTokensPerMinute).Err()
-		if err != nil {
+		exitCode, err := rateLimitScript.Run(c, redisClient, []string{userId}, requestLimit).Int()
+		if exitCode == 1 {
 			api.HandleError(c, http.StatusTooManyRequests, err, "Rate Limit Exceeded")
 			c.Abort()
 			return
